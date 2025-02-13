@@ -24,6 +24,11 @@ type WordnikResponse struct {
 	} `json:"examples"`
 }
 
+type WordDefinition struct {
+	Text         string `json:"text"`
+	PartOfSpeech string `json:"partOfSpeech"`
+}
+
 func GetWordOfTheDay() string {
 	err := godotenv.Load(".env")
 	if err != nil {
@@ -83,4 +88,56 @@ func GetWordOfTheDay() string {
 	}
 
 	return fmt.Sprintf("📖 **Word of the Day**: **%s**\n%s\n%s", result.Word, definition, example)
+}
+
+func GetWord(word string) string {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatalf("[GetWord] Error loading .env file: %v", err)
+	}
+
+	wordnikURL := os.Getenv("WORDNIK_URL")
+	if wordnikURL == "" {
+		log.Fatalf("[GetWord] Missing WORDNIK_URL in environment variables.")
+	}
+
+	wordnikToken := os.Getenv("WORDNIK_TOKEN")
+	if wordnikToken == "" {
+		log.Fatalf("[GetWord] Missing WORDNIK_TOKEN in environment variables.")
+	}
+
+	apiURL := fmt.Sprintf("%s/word.json/%s/definitions?limit=1&api_key=%s", wordnikURL, word, wordnikToken)
+
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		log.Printf("[GetWord] Error making request to Wordnik: %v", err)
+		return "⚠️ Error fetching word definition."
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[GetWord] Wordnik API returned status: %d", resp.StatusCode)
+		return "⚠️ No definition found."
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("[GetWord] Error reading response body: %v", err)
+		return "⚠️ Error reading response."
+	}
+
+	var definitions []WordDefinition
+	err = json.Unmarshal(body, &definitions)
+	if err != nil {
+		log.Printf("[GetWord] Error parsing JSON: %v", err)
+		return "⚠️ Error parsing response."
+	}
+
+	if len(definitions) == 0 {
+		log.Println("[GetWord] No definitions found.")
+		return "⚠️ No definition found."
+	}
+
+	definition := definitions[0]
+	return fmt.Sprintf("📖 **%s** (%s): %s", word, definition.PartOfSpeech, definition.Text)
 }

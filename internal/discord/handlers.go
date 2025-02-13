@@ -36,6 +36,8 @@ func (b *Bot) handleInteractionCreate(s *discordgo.Session, i *discordgo.Interac
 	switch commandName {
 	case "word-of-the-day":
 		b.handleWordOfTheDay(s, i)
+	case "define":
+		b.handleDefineWord(s, i)
 	default:
 		log.Printf("[handleInteractionCreate] Unknown command: %s", commandName)
 	}
@@ -72,5 +74,38 @@ func (b *Bot) handleWordOfTheDay(s *discordgo.Session, i *discordgo.InteractionC
 		}
 	} else {
 		log.Println("[handleWordOfTheDay] Response successfully sent!")
+	}
+}
+
+func (b *Bot) handleDefineWord(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	log.Println("[handleDefineWord] Received /define command")
+
+	options := i.ApplicationCommandData().Options
+	if len(options) == 0 {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "⚠️ Please provide a word to define.",
+			},
+		})
+		return
+	}
+
+	word := options[0].StringValue()
+	log.Printf("[handleDefineWord] Fetching definition for: %s", word)
+
+	definition := wordnik.GetWord(word)
+	if definition == "" {
+		definition = "⚠️ No definition found for this word."
+	}
+
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: fmt.Sprintf("📖 **Definition of %s**:\n%s", word, definition),
+		},
+	})
+	if err != nil {
+		log.Printf("[handleDefineWord] Failed to send response: %v", err)
 	}
 }
