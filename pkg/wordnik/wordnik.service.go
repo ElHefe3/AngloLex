@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -25,8 +26,17 @@ type WordnikResponse struct {
 }
 
 type WordDefinition struct {
-	Text         string `json:"text"`
-	PartOfSpeech string `json:"partOfSpeech"`
+	Text         string       `json:"text"`
+	PartOfSpeech string       `json:"partOfSpeech"`
+	ExampleUses  []ExampleUse `json:"exampleUses"`
+}
+
+type ExampleUse struct {
+	Text string `json:"text"`
+}
+
+type WordPronunciations struct {
+	
 }
 
 func GetWordOfTheDay() string {
@@ -106,7 +116,7 @@ func GetWord(word string) string {
 		log.Fatalf("[GetWord] Missing WORDNIK_TOKEN in environment variables.")
 	}
 
-	apiURL := fmt.Sprintf("%s/word.json/%s/definitions?limit=1&api_key=%s", wordnikURL, word, wordnikToken)
+	apiURL := fmt.Sprintf("%s/word.json/%s/definitions?limit=3&api_key=%s", wordnikURL, word, wordnikToken)
 
 	resp, err := http.Get(apiURL)
 	if err != nil {
@@ -138,6 +148,18 @@ func GetWord(word string) string {
 		return "⚠️ No definition found."
 	}
 
-	definition := definitions[0]
-	return fmt.Sprintf("📖 **%s** (%s): %s", word, definition.PartOfSpeech, definition.Text)
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("📖 **%s**\n", word))
+
+	for i, def := range definitions {
+		if i >= 3 {
+			break
+		}
+		result.WriteString(fmt.Sprintf("**%d.** *(%s)* %s\n", i+1, def.PartOfSpeech, def.Text))
+		if len(def.ExampleUses) > 0 {
+			result.WriteString(fmt.Sprintf("_Example:_ \"%s\"\n", def.ExampleUses[0].Text))
+		}
+	}
+
+	return result.String()
 }
