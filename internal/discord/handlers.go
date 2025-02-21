@@ -3,8 +3,10 @@ package discord
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/ElHefe3/AngloLex/pkg/wordnik"
+	"github.com/ElHefe3/AngloLex/utils"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -99,12 +101,27 @@ func (b *Bot) handleDefineWord(s *discordgo.Session, i *discordgo.InteractionCre
 		definition = "⚠️ No definition found for this word."
 	}
 
-	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+	etymologies, err := wordnik.GetEtymologies(word)
+	if err != nil || len(etymologies) == 0 {
+		etymologies = []string{"⚠️ No etymology found for this word."}
+	}
+
+	var formattedEtymologies []string
+	for _, ety := range etymologies {
+		formattedEtymologies = append(formattedEtymologies, xmlconverter.FormatEtymology(ety))
+	}
+
+	etymologyText := strings.Join(formattedEtymologies, "\n")
+
+	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: fmt.Sprintf("📖 **Definition of %s**:\n%s", word, definition),
+			Content: fmt.Sprintf(
+				"📖 **Definition of %s**:\n%s\n\n📝 **Etymology**:\n%s",
+				word, definition, etymologyText),
 		},
 	})
+
 	if err != nil {
 		log.Printf("[handleDefineWord] Failed to send response: %v", err)
 	}
