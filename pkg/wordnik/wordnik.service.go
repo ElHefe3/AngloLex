@@ -163,3 +163,49 @@ func GetWord(word string) string {
 
 	return result.String()
 }
+
+func GetEtymologies(word string) ([]string, error) {
+	err := godotenv.Load(".env")
+    if err != nil {
+        log.Fatalf("[GetEtymologies] Error loading.env file: %v", err)
+    }
+
+    wordnikURL := os.Getenv("WORDNIK_URL")
+    if wordnikURL == "" {
+        log.Fatalf("[GetEtymologies] Missing WORDNIK_URL in environment variables.")
+    }
+
+    wordnikToken := os.Getenv("WORDNIK_TOKEN")
+    if wordnikToken == "" {
+        log.Fatalf("[GetEtymologies] Missing WORDNIK_TOKEN in environment variables.")
+    }
+
+    apiURL := fmt.Sprintf("%s/word.json/%s/etymologies?useCanonical=false&api_key=%s", wordnikURL, word, wordnikToken)
+
+	resp, err := http.Get(apiURL)
+	if err != nil {
+        log.Printf("[GetEtymologies] Error making request to Wordnik: %v", err)
+        return nil, fmt.Errorf("error fetching etymologies")
+    }
+
+
+    if resp.StatusCode != http.StatusOK {
+        log.Printf("[GetEtymologies] Wordnik API returned status: %d", resp.StatusCode)
+        return nil, fmt.Errorf("no etymologies found")
+    }
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+        log.Printf("[GetEtymologies] Error reading response body: %v", err)
+        return nil, fmt.Errorf("error reading response")
+    }
+
+	var etymologies []string
+	err = json.Unmarshal(body, &etymologies)
+	if err != nil {
+        log.Printf("[GetEtymologies] Error parsing JSON: %v", err)
+        return nil, fmt.Errorf("error parsing response")
+    }
+
+	return etymologies, nil
+}
