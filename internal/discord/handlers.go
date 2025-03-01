@@ -7,6 +7,7 @@ import (
 
 	"github.com/ElHefe3/AngloLex/pkg/wordnik"
 	"github.com/ElHefe3/AngloLex/utils"
+	"github.com/ElHefe3/AngloLex/pkg/openai"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -40,6 +41,8 @@ func (b *Bot) handleInteractionCreate(s *discordgo.Session, i *discordgo.Interac
 		b.handleWordOfTheDay(s, i)
 	case "define":
 		b.handleDefineWord(s, i)
+	case "find-word-for":
+		b.handleFindWordFor(s, i)
 	default:
 		log.Printf("[handleInteractionCreate] Unknown command: %s", commandName)
 	}
@@ -125,4 +128,75 @@ func (b *Bot) handleDefineWord(s *discordgo.Session, i *discordgo.InteractionCre
 	if err != nil {
 		log.Printf("[handleDefineWord] Failed to send response: %v", err)
 	}
+}
+
+func (b *Bot) handleFindWordFor(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	log.Printf("[handleFindWord] Received /find-word-for command")
+
+	options := i.ApplicationCommandData().Options
+	if len(options) == 0 {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "⚠️ Please provide a sentence to find a word for.",
+			},
+		})
+		return
+	}
+
+	sentence := options[0].StringValue()
+	log.Printf("[handleFindWord] Fetching word for sentence: %s", sentence)
+
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	})
+	if err != nil {
+		log.Printf("[handleFindWord] Failed to acknowledge interaction: %v", err)
+		return
+	}
+
+	go func() {
+		newWord, err := openapi.FindWordFor(sentence)
+		if err != nil {
+			log.Printf("[handleFindWord] Error fetching word: %v", err)
+			errorMsg := fmt.Sprintf("⚠️ Could not find a suitable word for the given sentence:\n%s", sentence)
+			_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+				Content: &errorMsg,
+			})
+			if err != nil {
+				log.Printf("[handleFindWord] Failed to edit interaction response: %v", err)
+			}
+			return
+		}
+
+		lowercaseWord := strings.ToLower(newWord)
+
+		definition := wordnik.GetWord(lowercaseWord)
+		if definition == "" {
+			definition = "⚠️ No definition found for this word."
+		}
+
+		etymologies, err := wordnik.GetEtymologies(lowercaseWord)
+		if err != nil || len(etymologies) == 0 {
+			etymologies = []string{"⚠️ No etymology found for this word."}
+		}
+
+		var formattedEtymologies []string
+		for _, ety := range etymologies {
+			formattedEtymologies = append(formattedEtymologies, xmlconverter.FormatEtymology(ety))
+		}
+		etymologyText := strings.Join(formattedEtymologies, "\n")
+
+		responseMsg := fmt.Sprintf(
+			"✅ **Best word for your sentence:** **%s**\n\n📖 **Definition:**\n%s\n\n📝 **Etymology:**\n%s",
+			newWord, definition, etymologyText,
+		)
+
+		_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: &responseMsg,
+		})
+		if err != nil {
+			log.Printf("[handleFindWord] Failed to edit interaction response: %v", err)
+		}
+	}()
 }

@@ -33,7 +33,7 @@ func (b *Bot) RegisterCommands() {
 		},
 		{
 			Name:        "define",
-			Description: "Look up a word's definition",
+			Description: "Look up a word's definition.",
 			Type:        discordgo.ChatApplicationCommand,
 			Options: []*discordgo.ApplicationCommandOption{
 				{
@@ -41,6 +41,19 @@ func (b *Bot) RegisterCommands() {
 					Name:        "word",
 					Description: "The word to define",
 					Required:    true,
+				},
+			},
+		},
+		{
+			Name:			"find-word-for",
+			Description:    "Find a word that fits a given sentence.",
+            Type:            discordgo.ChatApplicationCommand,
+            Options:         []*discordgo.ApplicationCommandOption{
+				{
+					Type: 		 discordgo.ApplicationCommandOptionString,
+					Name:        "sentence",
+                    Description: "The sentence to find a word for",
+                    Required:    true,
 				},
 			},
 		},
